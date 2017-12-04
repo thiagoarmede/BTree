@@ -36,23 +36,26 @@ typedef struct Registro{
 
 //Função de pesquisa na árvore B.
 
-void PesquisaEspecifica(char chave[], Apontador pontPagina, Registro *regRetorno) {
+void PesquisaEspecifica(char *chave, Apontador pontPagina, Registro *regRetorno) {
     long i = 1;
     Indice indiceTemp;
     fstream fd1;
-    fd1.open("registros.bin", fstream::binary | fstream::in | fstream::out);
-
-    if (pontPagina == NULL) {
+    
+    if(pontPagina == NULL){
+        cout << "registro nao esta presente" << endl;
         return;
     }
 
     while (i < pontPagina->qtdRegistros && strcmp(chave, pontPagina->indices[i-1].Chave) > 0) i++;
 
-    if (strcmp(chave, pontPagina->indices[i-1].Chave) == 0) {
-        indiceTemp = pontPagina->indices[i - 1];
-        fd1.seekg(indiceTemp.posicaoArquivo*sizeof(Registro), ios::beg);
-        int x = sizeof(*regRetorno);
-        fd1.read((char*)regRetorno, x);
+    if (!strcmp(chave, pontPagina->indices[i-1].Chave)){
+        fd1.open("registros.bin", fstream::in | fstream::out | fstream::binary);
+        indiceTemp = pontPagina->indices[i-1];
+        cout << pontPagina->indices[i-1].Chave << endl;
+        cout << pontPagina->indices[i-1].posicaoArquivo << endl;
+        fd1.seekg(indiceTemp.posicaoArquivo, fd1.beg);
+        fd1.read((char*)regRetorno, sizeof(Registro));
+        cout << " -=-=-=-=- Chegou aqui -=--=-=-=" << endl;
         fd1.close();
         return;
     }
@@ -61,11 +64,10 @@ void PesquisaEspecifica(char chave[], Apontador pontPagina, Registro *regRetorno
         PesquisaEspecifica(chave, pontPagina->ponteiros[i - 1], regRetorno);
     else
         PesquisaEspecifica(chave, pontPagina->ponteiros[i], regRetorno);
-
 }
 
 void printLevelOrder(Apontador root) {
-  if (root == NULL){
+  if(root == NULL){
       return;
   } 
   queue<Apontador> filaPaginas;
@@ -94,7 +96,6 @@ void printLevelOrder(Apontador root) {
 }
 
 //Retorna as palavras da árvore que estão dentro do intervalo
-
 void devolveIntervalos(char intervalo1[], char intervalo2[], Apontador raiz, vector<Indice> &regs) {
     if (raiz == NULL) {
         return;
@@ -127,15 +128,10 @@ void devolvePorLetra(char letra, Apontador raiz, vector<Indice> &regs) {
     devolvePorLetra(letra, raiz->ponteiros[raiz->qtdRegistros], regs);
 }
 
-
-
 void InsereNaPagina(Apontador Ap, Indice indiceRetorno, Apontador ApDir) {
     short NaoAchouPosicao;
-    int k, posArquivo;
+    int k;
     k = Ap->qtdRegistros;
-    FILE *fd1;
-    fd1 = fopen("registros.bin", "rb");
-    fseek(fd1, 0, SEEK_END);
 
     NaoAchouPosicao = (k > 0);
     while (NaoAchouPosicao) {
@@ -151,11 +147,7 @@ void InsereNaPagina(Apontador Ap, Indice indiceRetorno, Apontador ApDir) {
     }
     Ap->ponteiros[k + 1] = ApDir;
     Ap->qtdRegistros++;
-    posArquivo = ftell(fd1) / sizeof (Registro);
-    indiceRetorno.posicaoArquivo = posArquivo;
     Ap->indices[k] = indiceRetorno;
-    cout << "inseriu" << endl;
-    fclose(fd1);
 }
 
 void Ins(Indice indice, Apontador Pagina, short *Cresceu, Indice *indiceRetorno, Apontador *ApRetorno, short *insArq) {
@@ -170,11 +162,11 @@ void Ins(Indice indice, Apontador Pagina, short *Cresceu, Indice *indiceRetorno,
         return;
     }
     while (i < Pagina->qtdRegistros && strcmp(indice.Chave, Pagina->indices[i-1].Chave) > 0) i++;
-//indice.Chave == Pagina->indices[i - 1].Chave
+
     if (strcmp(indice.Chave, Pagina->indices[i-1].Chave) == 0) {
         printf("Erro: Registro ja esta presente\n");
-        *Cresceu = 0;
-        *insArq = 0;
+        *Cresceu = FALSE;
+        *insArq = FALSE;
         return;
     }
 
@@ -209,38 +201,44 @@ void Ins(Indice indice, Apontador Pagina, short *Cresceu, Indice *indiceRetorno,
     *ApRetorno = ApTemp;
 }
 
-int Insere(Indice Insere, Apontador *Ap, short inserir) {
+int Insere(Indice Insere, Apontador *Ap, short inserir, Registro *reg) {
     short Cresceu;
     short insArq;
     Indice indiceRetorno;
     int posArq;
-    FILE *fd1, *fd2;
+    fstream fd1, fd2;
     Pagina *ApRetorno, *ApTemp;
-    //cout << "chegou aqui" << endl;
 
+    if(inserir == 0)
+        insArq = 0;
+    else{
+        fd2.open("registros.bin", fstream::in | fstream::out | fstream::binary | fstream::app);
+        fd2.seekg(0, fd2.end);
+        posArq = fd2.tellp();
+        Insere.posicaoArquivo = posArq;
+        insArq = 1;
+    }
+        
     Ins(Insere, *Ap, &Cresceu, &indiceRetorno, &ApRetorno, &insArq);
     
-    //cout << "chegou aqui2" << endl;
-    
-    if (Cresceu) {
-        ApTemp = new Pagina();
+    if(Cresceu){
+        cout << "cresceu arvore" << endl;
+        ApTemp = (Apontador)malloc(sizeof(Pagina));
         ApTemp->qtdRegistros = 1;
         ApTemp->indices[0] = indiceRetorno;
         ApTemp->ponteiros[1] = ApRetorno;
         ApTemp->ponteiros[0] = *Ap;
         *Ap = ApTemp;
+        cout << "fim do crescimento" << endl;
     }
-    if (inserir && insArq) {
-        fd1 = fopen("indices.bin", "a+b");
-        fd2 = fopen("registros.bin", "r+b");
-        fseek(fd2, -sizeof (Registro), SEEK_END);
-        posArq = ftell(fd2) / sizeof (Registro);
-        Insere.posicaoArquivo = posArq;
-        fseek(fd1, 0, SEEK_END);
-        fwrite(&Insere, sizeof (Indice), 1, fd1);
+    
+    if(inserir && insArq && reg){
+        fd1.open("indices.bin", fstream::in | fstream::out | fstream::binary | fstream::app);
         cout << Insere.posicaoArquivo << endl;
-        fclose(fd1);
-        fclose(fd2);
+        fd1.write((char*)&Insere, sizeof(Indice));
+        fd2.write((char*)reg, sizeof(Registro));
+        fd1.close();    
+        fd2.close();       
     }
 
     return insArq;
@@ -248,60 +246,28 @@ int Insere(Indice Insere, Apontador *Ap, short inserir) {
 
 void insereRegistro(Registro reg, Apontador *Arv) {
     Indice insere;
-    FILE *fd1;
-    short devoInserir;
-
-    fd1 = fopen("registros.bin", "ab+");
     strcpy(insere.Chave, reg.Chave);
     //insere.Chave = reg.Chave;
-    devoInserir = Insere(insere, Arv, 1);
-
-    if (devoInserir != 0) {
-        fwrite(&reg, sizeof(Registro), 1, fd1);
-    }
-    fclose(fd1);
+    Insere(insere, Arv, 1, &reg);
 }
 
 void carregaIndices(Apontador *raiz) {
     FILE *fd1;
     int inseridos = 0;
-    fd1 = fopen("indices.bin", "r+b");
-    Indice ind;
+    fd1 = fopen("indices.bin", "a+b");
+    Indice *ind = new Indice();
     
-    while (!feof(fd1)){    
-        fd1 = fopen("indices.bin", "r+b");
-        fseek(fd1, inseridos*sizeof(ind), SEEK_SET);
-        fread(&ind, sizeof(ind), 1, fd1);
+    while (!feof(fd1)){
+        ind = new Indice();
+        fread(ind, sizeof(Indice), 1, fd1);
         inseridos++;
-        //cout << ind.Chave << endl;
-        //cout << ind.posicaoArquivo << endl;
-        Insere(ind, raiz, 0);
+        Insere(*ind, raiz, 0, NULL);
+        delete(ind);
     }
-    
     fclose(fd1);
     cout << "Carregou Indices" << endl;
 }
 
-//void limpaArquivos(){
-//    FILE *fd1, *fd2;
-//    Indice indApaga;
-//    Registro regApaga;
-//    
-//    indApaga.Chave = "VAZIO";
-//    indApaga.posicaoArquivo = 9999;
-//    
-//    regApaga.Chave = "VAZIO";
-//    regApaga.Significado = "VAZIO";
-//    
-//    fd1 = fopen("registros.bin", "wb");
-//    fd2 = fopen("indices.bin", "wb");
-//    
-//    fwrite(&regApaga, sizeof(Registro), 50, fd1);
-//    fwrite(&indApaga, sizeof(Indice), 50, fd2);
-//    
-//    fclose(fd1);
-//    fclose(fd2);
-//}
 void inicializa(Apontador *arv){
     *arv = NULL;   
 }
@@ -311,9 +277,11 @@ void especifico(Apontador *arv){
     char palavra[50];
     Registro *regRetorno = new Registro();
     cout << endl;
-    cout << "Digite a palavra a ser buscada: ";            
-    cin >> palavra;
+    cout << "Digite a palavra a ser buscada: ";
+    fflush(stdin);
+    fgets(palavra, 49, stdin);
     PesquisaEspecifica(palavra, *arv, regRetorno);
+    printf("Palavra: %s", regRetorno->Chave);
     cout << endl << "Palavra: " << regRetorno->Chave << endl;
     cout << "Significado: " << regRetorno->Significado << endl;
 }
@@ -322,10 +290,12 @@ void intervalos(Apontador *arv){
     system("cls");
     char palavra1[50], palavra2[50];
     vector<Indice> buscados;
+    fflush(stdin);
     cout << "Digite a primeira palavra: ";
-    cin >> palavra1;
+    fgets(palavra1, 49, stdin);
     cout << endl << "Digite a segunda palavra: ";
-    cin >> palavra2;
+    fflush(stdin);
+    fgets(palavra2, 49, stdin);
     devolveIntervalos(palavra1, palavra2, *arv, buscados);
     cout << endl << "Palavras Buscadas: " << endl;
     for(int i=0;i<buscados.size();i++){
@@ -333,9 +303,11 @@ void intervalos(Apontador *arv){
     }
 }
 
+
 void letra(Apontador *arv){
     system("cls");
     char letra;
+    fflush(stdin);
     cout << "Digite a letra para buscar as palavras: ";
     cin >> letra;
     vector<Indice> buscados2;
@@ -355,12 +327,11 @@ void nivel(Apontador *arv){
 void insert (Apontador *arv){
     system("cls");
     Registro regInserido;
-    
+    fflush(stdin);
     cout << "Digite a palavra: ";
-    cin >> regInserido.Chave;
+    fgets(regInserido.Chave, 49, stdin);
     cout << endl << "Digite o significado: ";
-    cin >> regInserido.Significado;
-    
+    fgets(regInserido.Significado, 99, stdin);
     insereRegistro(regInserido, arv);   
 }
 
